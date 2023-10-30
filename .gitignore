@@ -1,0 +1,4 @@
+# the file ignore in lab3
+/lab3/lab3-*/*
+!/lab3/lab3-*/*.c
+!/lab3/lab3-*/Makefile
