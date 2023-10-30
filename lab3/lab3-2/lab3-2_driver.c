@@ -18,6 +18,8 @@
 #define GPIO_20 (20)
 #define GPIO_21 (21) 
   
+const int seven_seg_pins[7] = {GPIO_2, GPIO_3, GPIO_4, GPIO_12, GPIO_16, GPIO_20, GPIO_21};
+
 dev_t dev = 0; 
 static struct class *dev_class; 
 static struct cdev etx_cdev; 
@@ -106,7 +108,6 @@ static const int seven_seg_code[10][7] = {
 };
 
 
-const int seven_seg_pins[7] = {GPIO_2, GPIO_3, GPIO_4, GPIO_12, GPIO_16, GPIO_20, GPIO_21};
 
 
 static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off) {
@@ -192,80 +193,36 @@ static int __init etx_driver_init(void)
     pr_err( "Cannot create the Device \n"); 
     goto r_device; 
   } 
-    if(gpio_is_valid(GPIO_2) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_2); 
-        goto r_device; 
-    }
-    if(gpio_is_valid(GPIO_3) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_3); 
-        goto r_device; 
-    }
-    if(gpio_is_valid(GPIO_4) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_4); 
-        goto r_device; 
-    }
-
-    if(gpio_is_valid(GPIO_12) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_12); 
-        goto r_device; 
-    }
-
-    if(gpio_is_valid(GPIO_16) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_16); 
-        goto r_device; 
-    }
-
-    if(gpio_is_valid(GPIO_20) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_20); 
-        goto r_device; 
-    }
     //Checking the GPIO is valid or not 
-    if(gpio_is_valid(GPIO_21) == false){ 
-        pr_err("GPIO %d is not valid\n", GPIO_21); 
+  for(int i = 0; i < 7; i++) 
+  {
+    if(gpio_is_valid(seven_seg_pins[i]) == false)
+    { 
+        pr_err("GPIO %d is not valid\n", seven_seg_pins[i]); 
         goto r_device; 
-    } 
-   
-   if(gpio_request(GPIO_2,"GPIO_2") < 0){ 
-        pr_err("ERROR: GPIO %d request\n", GPIO_2); 
-        goto r_gpio; 
     }
-   if(gpio_request(GPIO_3,"GPIO_3") < 0){ 
-        pr_err("ERROR: GPIO %d request\n", GPIO_3); 
-        goto r_gpio; 
+  }
+
+  //Requesting the GPIO
+  for(int i = 0; i < 7; i++)
+  {
+    if(gpio_request(seven_seg_pins[i], "seven_seg_pins") < 0)
+    {
+        pr_err("ERROR: GPIO %d request\n", seven_seg_pins[i]);
+        goto r_gpio;
     }
-    if(gpio_request(GPIO_4,"GPIO_4") < 0){ 
-          pr_err("ERROR: GPIO %d request\n", GPIO_4); 
-          goto r_gpio; 
-      }
-   if(gpio_request(GPIO_12,"GPIO_12") < 0){ 
-        pr_err("ERROR: GPIO %d request\n", GPIO_12); 
-        goto r_gpio; 
-    } 
+  }
 
-    if(gpio_request(GPIO_16,"GPIO_16") < 0){ 
-        pr_err("ERROR: GPIO %d request\n", GPIO_16); 
-        goto r_gpio; 
-    } 
-
-    if(gpio_request(GPIO_20,"GPIO_20") < 0){ 
-        pr_err("ERROR: GPIO %d request\n", GPIO_20); 
-        goto r_gpio; 
-    }
-
-    //Requesting the GPIO 
-    if(gpio_request(GPIO_21,"GPIO_21") < 0){ 
-        pr_err("ERROR: GPIO %d request\n", GPIO_21); 
-        goto r_gpio; 
-    } 
    
   //configure the GPIO as output 
-  gpio_direction_output(GPIO_2, 0);
-  gpio_direction_output(GPIO_3, 0);
-  gpio_direction_output(GPIO_4, 0);
-  gpio_direction_output(GPIO_12, 0);
-  gpio_direction_output(GPIO_16, 0);
-  gpio_direction_output(GPIO_20, 0);
-  gpio_direction_output(GPIO_21, 0); 
+  for(int i = 0; i < 7; i++)
+  {
+    if(gpio_direction_output(seven_seg_pins[i], 0) < 0)
+    {
+        pr_err("ERROR: GPIO %d direction\n", seven_seg_pins[i]);
+        goto r_gpio;
+    }
+  }
    
   /* Using this call the GPIO 21 will be visible in /sys/class/gpio/ 
   ** Now you can change the gpio values by using below commands also. 
@@ -275,25 +232,22 @@ static int __init etx_driver_init(void)
   **  
   ** the second argument prevents the direction from being changed. 
   */ 
-  gpio_export(GPIO_2, false);
-  gpio_export(GPIO_3, false);
-  gpio_export(GPIO_4, false);
-  gpio_export(GPIO_12, false);
-  gpio_export(GPIO_16, false);
-  gpio_export(GPIO_20, false);
-  gpio_export(GPIO_21, false);
 
-    pr_info("Device Driver Insert...Done!!!\n"); 
+  for(int i = 0; i < 7; i++)
+  {
+    gpio_export(seven_seg_pins[i], false);
+  }
+
+  pr_info("Device Driver Insert...Done!!!\n"); 
   return 0; 
   
 r_gpio: 
-  gpio_free(GPIO_2);
-  gpio_free(GPIO_3);
-  gpio_free(GPIO_4);
-  gpio_free(GPIO_12);
-  gpio_free(GPIO_16);
-  gpio_free(GPIO_20);
-  gpio_free(GPIO_21); 
+
+  for(int i = 0; i < 7; i++)
+  {
+    gpio_free(seven_seg_pins[i]);
+  }
+
 r_device: 
   device_destroy(dev_class,dev); 
 r_class: 
@@ -311,15 +265,11 @@ r_unreg:
 */  
 static void __exit etx_driver_exit(void) 
 { 
-  gpio_unexport(GPIO_12);
-  gpio_unexport(GPIO_16);
-  gpio_unexport(GPIO_20);
-  gpio_unexport(GPIO_21); 
-
-  gpio_free(GPIO_12);
-  gpio_free(GPIO_16);
-  gpio_free(GPIO_20);
-  gpio_free(GPIO_21); 
+  for(int i = 0; i < 7; i++)
+  {
+    gpio_unexport(seven_seg_pins[i]);
+    gpio_free(seven_seg_pins[i]);
+  }
 
   device_destroy(dev_class,dev); 
   class_destroy(dev_class); 
