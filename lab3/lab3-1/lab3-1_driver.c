@@ -89,6 +89,7 @@ static ssize_t etx_read(struct file *filp,
 */  
 //Henry's code
 static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off) {
+    //buf store the char from user (1 byte)
     uint8_t rec_buf[10] = {0};
    
     if (copy_from_user(rec_buf, buf, len) > 0) {
