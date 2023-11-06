@@ -1,1 +1,0 @@
-cmd_/home/henry/Embedding_sys/hw1/seven_seg_driver.mod := printf '%s\n'   seven_seg_driver.o | awk '!x[$$0]++ { print("/home/henry/Embedding_sys/hw1/"$$0) }' > /home/henry/Embedding_sys/hw1/seven_seg_driver.mod

@@ -1,1 +1,0 @@
-cmd_/home/henry/Embedding_sys/hw1/modules.order := {   echo /home/henry/Embedding_sys/hw1/led_driver.ko;   echo /home/henry/Embedding_sys/hw1/seven_seg_driver.ko; :; } > /home/henry/Embedding_sys/hw1/modules.order
