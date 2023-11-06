@@ -17,20 +17,30 @@ typedef struct {
     MenuItem items[2];  // 每家餐厅有两个菜单项
 } Restaurant;
 
+
+int countDigits(int num) {
+    int count = 0;
+    while (num != 0) {
+        num /= 10;
+        ++count;
+    }
+    return count;
+}
+
 int main() {
     int menuOption = 0;
     int orderConfirmed = 0;
     int quantity = 0;
 
-    // //open two fd to write the num
-    // int fd1, fd2;
-    // fd1 = open("/dev/distance_device", O_RDWR); //用led
-    // fd2 = open("/dev/money_device", O_RDWR);   //用7-seg
+    //open two fd to write the num
+    int fd1, fd2;
+    fd1 = open("/dev/distance_device", O_RDWR); //用led
+    fd2 = open("/dev/money_device", O_RDWR);   //用7-seg
     
-    // if(fd1 < 0 || fd2 < 0){
-    //     printf("open device error\n");
-    //     return 0;
-    // }
+    if(fd1 < 0 || fd2 < 0){
+        printf("open device error\n");
+        return 0;
+    }
 
 
     // 定义三家餐厅和其菜单项
@@ -114,12 +124,12 @@ int main() {
                     printf("訂單已從%s送出，總金額：%d\n", restaurants[selectedRestaurant - 1].name, totalAmount);
 
                     //Henry change the total amount by int to char
-                    char totalAmount_char[10];
+                    char totalAmount_char[countDigits(totalAmount)];
                     sprintf(totalAmount_char, "%d", totalAmount);
 
                     //Henry write the distance and money to my custom device
-                    // write(fd1, restaurants[selectedRestaurant - 1].distance, sizeof(restaurants[selectedRestaurant - 1].distance));
-                    // write(fd2, &totalAmount, sizeof(totalAmount));
+                    write(fd1, restaurants[selectedRestaurant - 1].distance, sizeof(restaurants[selectedRestaurant - 1].distance));
+                    write(fd2, totalAmount_char, sizeof(totalAmount_char));
                     orderConfirmed = 1;
                     break;
                 }

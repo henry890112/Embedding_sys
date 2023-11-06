@@ -1,0 +1,1 @@
+cmd_/home/henry/Embedding_sys/hw1/led_driver.ko := aarch64-linux-gnu-ld -r -EL  -maarch64elf -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/henry/Embedding_sys/hw1/led_driver.ko /home/henry/Embedding_sys/hw1/led_driver.o /home/henry/Embedding_sys/hw1/led_driver.mod.o;  true

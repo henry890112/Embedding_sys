@@ -75,7 +75,7 @@ static ssize_t etx_read(struct file *filp,
     uint8_t gpio_state = 0; 
 
     //reading GPIO value 
-    gpio_state = gpio_get_value(GPIO_21); 
+    gpio_state = gpio_get_value(GPIO_13); 
 
     //write to user 
     len = 1; 
@@ -94,38 +94,36 @@ const int eight_led_pins[8] = {GPIO_10, GPIO_9, GPIO_11, GPIO_5, GPIO_6, GPIO_13
 ** This function will be called when we write the Device file 
 */  
 //Henry's code
-static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off) {
+int total_dis = 0;
+static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
+{
     //buf store the char from user (1 byte)
     uint8_t rec_buf[10] = {0};
    
     if (copy_from_user(rec_buf, buf, len) > 0) {
         pr_err("ERROR: Not all the bytes have been copied from user\n");
     }
-
     // change the rec_buf to int
-    int total_dis = rec_buf[i] - '0'; // 將字符轉換為整數
-    int count = 0;
+    total_dis = rec_buf[0] - '0'; // 將字符轉換為整數
+    pr_info("Write Function: total_dis = %d\n", total_dis);
 
     if (rec_buf[0] >= '0' && rec_buf[0] <= '9') {
-        int num;
         for (int remaining_dis = total_dis; remaining_dis >= 0; remaining_dis--)
         {
             // 关闭所有LED
-            for (i = 0; i < total_dis; i++) 
+            for (int i = 0; i < total_dis; i++) 
             {
                 gpio_set_value(eight_led_pins[i], 0);
             }
             // 打开距离对应数量的LED
-            for (i = 0; i < remaining_dis; i++) 
+            for (int i = 0; i < remaining_dis; i++) 
             {
                 gpio_set_value(eight_led_pins[i], 1);
+                pr_info("LED %d is on\n", i);
             }
-
             msleep(1000);
-            }else 
-            {
-                pr_err("Invalid digit: Please provide a digit between 0 and 9\n");
-            }
+
+        }
     }else 
     {
         pr_err("Invalid input: Please provide a digit between 0 and 9\n");
@@ -134,7 +132,6 @@ static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, 
     return len;
 }
 
- 
 /* 
 ** Module Init function 
 */  
@@ -157,7 +154,7 @@ static int __init etx_driver_init(void)
     } 
 
     /*Creating struct class*/ 
-    if((dev_class = class_create(THIS_MODULE,"etx_class")) == NULL){ 
+    if((dev_class = class_create(THIS_MODULE,"distance_device_class")) == NULL){ 
     pr_err("Cannot create the struct class\n"); 
     goto r_class; 
     } 
@@ -169,7 +166,7 @@ static int __init etx_driver_init(void)
     goto r_device; 
     } 
    
-    for(i = 0; i < 8; i++) {
+    for(int i = 0; i < 8; i++) {
         if(gpio_is_valid(eight_led_pins[i]) == false){ 
             pr_err("GPIO %d is not valid\n", eight_led_pins[i]); 
             goto r_device; 
@@ -178,9 +175,9 @@ static int __init etx_driver_init(void)
             pr_err("ERROR: GPIO %d request\n", eight_led_pins[i]); 
             goto r_gpio; 
         }
-        if(gpio_direction_output(seven_seg_pins[i], 0) < 0)
+        if(gpio_direction_output(eight_led_pins[i], 0) < 0)
         {
-            pr_err("ERROR: GPIO %d direction\n", seven_seg_pins[i]);
+            pr_err("ERROR: GPIO %d direction\n", eight_led_pins[i]);
             goto r_gpio;
         }
         gpio_direction_output(eight_led_pins[i], 0);
@@ -199,7 +196,7 @@ static int __init etx_driver_init(void)
     return 0; 
   
 r_gpio: 
-    for(i = 0; i < 8; i++) 
+    for(int i = 0; i < 8; i++) 
     {
         gpio_free(eight_led_pins[i]);
     }

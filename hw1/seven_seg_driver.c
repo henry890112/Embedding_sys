@@ -109,43 +109,59 @@ static const int seven_seg_code[10][7] = {
 
 
 
-
+int digit;
+int len_as_int;
 static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off) {
-    uint8_t rec_buf[len] = {0};
+    uint8_t rec_buf[10] = {0};
 
     if (copy_from_user(rec_buf, buf, len) > 0) {
         pr_err("ERROR: Not all the bytes have been copied from user\n");
     }
 
-    if (rec_buf[0] >= '0' && rec_buf[0] <= '9') {
-        //Henry get the number from the user (echo > 311512049 /dev/etx_device)
-        int digit;
-        for (int i = 0; i < len; i++)
-        {
-          pr_info("rec_buf[%d] = %c\n", i, rec_buf[i]);
-      
-
-          digit = rec_buf[i] - '0'; // 將字符轉換為整數  
-
-          if (digit >= 0 && digit <= 9) 
-          {
-            // 设置共阳极七段数码显示器的每个引脚的状态
-            for (int i = 0; i < 7; i++) 
-            {
-                gpio_set_value(seven_seg_pins[i], seven_seg_code[digit][i]);
-            }
-
-            // 延时 0.5 秒
-            msleep(500);
-          } 
-          else 
-          {
-              pr_err("Invalid digit: Please provide a digit between 0 and 9\n");
-          }
-        }
-    } else {
-        pr_err("Invalid input: Please provide a digit between 0 and 9\n");
+    //Henry get the number from the user (echo > 311512049 /dev/etx_device)
+    // print the rec_buf
+    len_as_int = (int)len;
+    pr_info("len = %d\n", len_as_int);
+    for(int i = 0; i < len_as_int; i++)
+    {
+        pr_info("rec_buf[%d] = %c\n", i, rec_buf[i]);
     }
+
+    for (int i = 0; i < len_as_int; i++)
+    {
+      pr_info("rec_buf[%d] = %c\n", i, rec_buf[i]);
+  
+
+      digit = rec_buf[i] - '0'; // 將字符轉換為整數  
+
+      if (digit >= 0 && digit <= 9) 
+      {
+        // 设置共阳极七段数码显示器的每个引脚的状态
+        for (int i = 0; i < 7; i++) 
+        {
+            gpio_set_value(seven_seg_pins[i], seven_seg_code[digit][i]);
+            pr_info("seven_seg_pins[%d] = %d\n", i, seven_seg_code[digit][i]);
+        }
+
+        // 延时 0.5 秒
+        msleep(500);
+        for (int i = 0; i < 7; i++) 
+        {
+            gpio_set_value(seven_seg_pins[i], 0);
+        }
+        msleep(250);
+      }
+      else 
+      {
+          pr_err("Invalid digit: Please provide a digit between 0 and 9\n");
+      }
+    }
+    for (int i = 0; i < 7; i++) 
+    {
+        gpio_set_value(seven_seg_pins[i], 0);
+        pr_info("Trun off the seven_seg_pins");
+    }
+
    
     return len;
 }
@@ -173,7 +189,7 @@ static int __init etx_driver_init(void)
   } 
   
   /*Creating struct class*/ 
-  if((dev_class = class_create(THIS_MODULE,"etx_class")) == NULL){ 
+  if((dev_class = class_create(THIS_MODULE,"money_device_class")) == NULL){ 
     pr_err("Cannot create the struct class\n"); 
     goto r_class; 
   } 
