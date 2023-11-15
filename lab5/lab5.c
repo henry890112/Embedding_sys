@@ -71,6 +71,13 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    // 可以使用相同的port
+    int yes = 1;
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+        perror("Error setting socket option");
+        exit(EXIT_FAILURE);
+    }
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
