@@ -142,13 +142,16 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
             }
 
             // 更新 totalAmount
-            orderInfo->totalAmount += quantity * shops[orderInfo->shopIndex].items[0].price;
+            // 根據itemName找到對應的餐點價格
+            for (int i = 0; i < shops[orderInfo->shopIndex].numItems; i++) {
+                if (strcmp(shops[orderInfo->shopIndex].items[i].name, itemName) == 0) {
+                    orderInfo->totalAmount += shops[orderInfo->shopIndex].items[i].price * quantity;
+                    break;
+                }
+            }
 
             // 儲存已點餐的資訊
-            
             strcat(response, itemName);
-            // sprintf(response + strlen(response), " %d", quantity);
-            // send(clientSocket, response, strlen(response), 0);
             // change the quantity to string and append to response
             strcat(response, " ");
             sprintf(quantityStr, "%d", quantity);
@@ -244,7 +247,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    if (listen(serverSocket, 1) == -1) {
+    if (listen(serverSocket, 5) == -1) {
         perror("Listening failed");
         exit(EXIT_FAILURE);
     }
@@ -252,19 +255,25 @@ int main() {
     printf("Server is listening on port %d...\n", SERVER_PORT);
 
     
-    int clientSocket = accept(serverSocket, NULL, NULL);
+    
     
     //多一個while是避免可以一直accept新的client導致無法close
+    //每次循環都會accept到同一個client
     while(1){
-        if (clientSocket == -1) {
+        int clientSocket = accept(serverSocket, NULL, NULL);
+        orderInfo.status = ORDER_PENDING;   // 新訂單皆要初始化成ORDER_PENDING
+        while(1){
+            if (clientSocket == -1) {
             perror("Accept failed");
             continue;
+            }
+            handleCommand(clientSocket, shops, &orderInfo);
+            if (orderInfo.status == ORDER_CANCELED) {
+                close(clientSocket);
+                break;
+            }
         }
-        handleCommand(clientSocket, shops, &orderInfo);
-        if (orderInfo.status == ORDER_CANCELED) {
-            close(clientSocket);
-            break;
-        }
+        
     }
     
     close(serverSocket);

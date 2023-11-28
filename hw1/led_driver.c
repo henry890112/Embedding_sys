@@ -12,7 +12,7 @@
 //LED is connected to this GPIO 
 #define GPIO_10 (10)
 #define GPIO_9 (9)
-#define GPIO_11 (11)
+#define GPIO_22 (22)
 #define GPIO_5 (5)
 #define GPIO_6 (6)
 #define GPIO_13 (13)
@@ -88,7 +88,7 @@ static ssize_t etx_read(struct file *filp,
     return 0; 
 } 
 
-const int eight_led_pins[8] = {GPIO_10, GPIO_9, GPIO_11, GPIO_5, GPIO_6, GPIO_13, GPIO_19, GPIO_26};
+const int eight_led_pins[8] = {GPIO_10, GPIO_9, GPIO_22, GPIO_5, GPIO_6, GPIO_13, GPIO_19, GPIO_26};
 
 /* 
 ** This function will be called when we write the Device file 
