@@ -6,18 +6,48 @@
 #include <pthread.h>
 #include <signal.h>
 #include <semaphore.h>
+#include <sys/sem.h>
+#include <errno.h>
+
 
 int account_balance = 0;
-sem_t balance_semaphore;
+int sem_id; // 不再需要全局變量
+#define SEM_KEY 1234
 #define MAX_CLIENTS 10
-
 int server_socket;
 
 void stop_parent(int signum) {
     signal(SIGINT, SIG_DFL);
     close(server_socket);
-    printf("Server closed\n");
+    semctl(sem_id, 0, IPC_RMID, 0); // 移除信號量
+    printf("Server closed and removed semaphore.\n");
     exit(signum);
+}
+
+int P(int s) {
+    struct sembuf sop;
+    sop.sem_num = 0;
+    sop.sem_op = -1;
+    sop.sem_flg = 0;
+    if (semop(s, &sop, 1) < 0) {
+        perror("P(): semop failed");
+        exit(EXIT_FAILURE);
+    } else {
+        return 0;
+    }
+}
+
+int V(int s) {
+    struct sembuf sop;
+    sop.sem_num = 0;
+    sop.sem_op = 1;
+    sop.sem_flg = 0;
+    if (semop(s, &sop, 1) < 0) {
+        perror("V(): semop failed");
+        exit(EXIT_FAILURE);
+    } else {
+        return 0;
+    }
 }
 
 void *handle_client(void *arg) {
@@ -32,20 +62,19 @@ void *handle_client(void *arg) {
     sscanf(buffer, "%s %d %d", action, &amount, &times);
 
     for (int i = 0; i < times; ++i) {
-        sem_wait(&balance_semaphore);
+        P(sem_id);
         if (strcmp(action, "deposit") == 0) {
             account_balance += amount;
         } else if (strcmp(action, "withdraw") == 0) {
             account_balance -= amount;
         }
-        sem_post(&balance_semaphore);
+        V(sem_id);
 
         printf("After %s: %d\n", action, account_balance);
     }
 
     close(client_socket);
     free(arg);
-    pthread_exit(NULL);
 }
 
 int start_server(int port) {
@@ -77,15 +106,39 @@ int start_server(int port) {
         exit(EXIT_FAILURE);
     }
 
-    sem_init(&balance_semaphore, 0, 1);  // 初始化 semaphore
-    // print the sem id
-    printf("sem id: %ld\n", balance_semaphore.__align);
+    // 使用自己指定的key值創建信號量
+    int key = SEM_KEY;
+    if ((sem_id = semget(key, 1, IPC_CREAT | 0666)) == -1) {
+        perror("semget");
+        exit(EXIT_FAILURE);
+    }
+
+    if (sem_id < 0) {
+        if (errno == EEXIST) {
+            // 信號量已經存在，只取得其 ID
+            sem_id = semget(key, 1, 0666);
+            printf("Semaphore already exists. Semaphore ID: %d\n", sem_id);
+        }
+    } else {
+        // 初次創建信號量，將其初值設置為 1
+        printf("Semaphore first created. Semaphore ID: %d\n", sem_id);
+        if (semctl(sem_id, 0, SETVAL, 1) < 0)
+        {
+            fprintf(stderr, "Error setting initial value for the semaphore: %s\n", strerror(errno));
+            exit(1);
+        }
+    }
+
+    printf("Semaphore created successfully. Semaphore ID: %d\n", sem_id);
+
+
 
     printf("Server listening on port %d\n", port);
     int count = 0;
+
     while (1) {
         int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
-
+        
         if (client_socket == -1) {
             perror("Error accepting connection");
             continue;
@@ -96,6 +149,7 @@ int start_server(int port) {
         pthread_t client_thread;
         int *client_socket_ptr = (int *)malloc(sizeof(int));
         *client_socket_ptr = client_socket;
+
         if (pthread_create(&client_thread, NULL, handle_client, (void *)client_socket_ptr) != 0) {
             perror("pthread_create");
             close(client_socket);
@@ -106,8 +160,6 @@ int start_server(int port) {
         // printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!thread created %d\n", ++count);
     }
 
-    sem_destroy(&balance_semaphore);  // 銷毀 semaphore
-    close(server_socket);
     return 0;
 }
 
