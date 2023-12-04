@@ -5,56 +5,50 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <signal.h>
+#include <semaphore.h>
 
 int account_balance = 0;
-pthread_mutex_t balance_mutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t balance_semaphore;
 #define MAX_CLIENTS 10
 
 int server_socket;
 
 void stop_parent(int signum) {
-    signal(SIGINT, SIG_DFL);  // 將 SIGINT 處理程序設為默認行為
-    close(server_socket);     // 關閉伺服器主套接字
+    signal(SIGINT, SIG_DFL);
+    close(server_socket);
     printf("Server closed\n");
-    exit(signum);            // 結束程式
+    exit(signum);
 }
 
 void *handle_client(void *arg) {
     int client_socket = *(int *)arg;
-    char buffer[1024];
+    char buffer[256];
 
-    // 接收客戶端的要求
     int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
-
-    // 解析客戶端的要求
     buffer[bytes_received] = '\0';
+
     char action[10];
     int amount, times;
-    // sscanf接收的參數是指標，所以要加上&
     sscanf(buffer, "%s %d %d", action, &amount, &times);
 
-    // 重複執行指定次數
     for (int i = 0; i < times; ++i) {
-        pthread_mutex_lock(&balance_mutex);
+        sem_wait(&balance_semaphore);
         if (strcmp(action, "deposit") == 0) {
             account_balance += amount;
         } else if (strcmp(action, "withdraw") == 0) {
             account_balance -= amount;
         }
-        pthread_mutex_unlock(&balance_mutex);
+        sem_post(&balance_semaphore);
 
-        // 輸出帳戶餘額
         printf("After %s: %d\n", action, account_balance);
     }
 
-    // 關閉連線
     close(client_socket);
-    free(arg); // 释放传递给线程的内存
+    free(arg);
     pthread_exit(NULL);
 }
 
 int start_server(int port) {
-
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -65,7 +59,6 @@ int start_server(int port) {
         perror("Error creating socket");
         exit(EXIT_FAILURE);
     }
-
 
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -84,23 +77,22 @@ int start_server(int port) {
         exit(EXIT_FAILURE);
     }
 
+    sem_init(&balance_semaphore, 0, 1);  // 初始化 semaphore
+    // print the sem id
+    printf("sem id: %ld\n", balance_semaphore.__align);
+
     printf("Server listening on port %d\n", port);
     int count = 0;
-    while (1)
-    {
-
+    while (1) {
         int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
-        
+
         if (client_socket == -1) {
             perror("Error accepting connection");
             continue;
         }
 
-        printf("Accepted connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        // printf("Accepted connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        // 每次有新連線，啟動一個新的執行緒處理
-        // client一直近來就會一直開新的thread
-        // 为每个客户端创建一个线程
         pthread_t client_thread;
         int *client_socket_ptr = (int *)malloc(sizeof(int));
         *client_socket_ptr = client_socket;
@@ -109,12 +101,12 @@ int start_server(int port) {
             close(client_socket);
             free(client_socket_ptr);
         }
-        // join 會等待thread結束才會繼續執行
-        // pthread_join(client_thread, NULL);
+
         pthread_detach(client_thread);
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!thread created %d\n", ++count);
+        // printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!thread created %d\n", ++count);
     }
 
+    sem_destroy(&balance_semaphore);  // 銷毀 semaphore
     close(server_socket);
     return 0;
 }
