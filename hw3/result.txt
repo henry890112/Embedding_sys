@@ -1,0 +1,2 @@
+customer: 2
+income: 2680$
