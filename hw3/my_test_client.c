@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 
 #define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 8889
+#define SERVER_PORT 8888
 
 int clientSocket;  // 全域變數，存儲客戶端 socket
 

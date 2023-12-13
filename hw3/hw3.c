@@ -6,12 +6,13 @@
 #include <pthread.h>
 #include <limits.h>
 #include <signal.h>
+#include <time.h>
 
 
 
 #define SERVER_PORT 8888
 #define NUM_DELIVERY_PERSONS 2
-#define MAX_CLIENTS 100
+#define MAX_CLIENTS 1000
 
 int totalIncome = 0;
 int totalCustomer = 0;
@@ -68,6 +69,8 @@ struct OrderInfo {
 struct DeliveryPerson {
     int id;
     pthread_mutex_t mutex;
+    // 此mutex控制特定送貨員要在第1個client執行完才能執行第2個client
+    pthread_mutex_t mutex_control_queue;
     int secondsRemaining;
     int recieveTime;  // 當下訂單送貨員的時間 0~8
     int orderQueue[MAX_CLIENTS];  // Queue to store distances
@@ -87,6 +90,10 @@ void delivery_person_init(struct DeliveryPerson *deliveryPersons) {
             printf("互斥鎖初始化失敗\n");
             return;
         }
+        if (pthread_mutex_init(&deliveryPersons[i].mutex_control_queue, NULL) != 0) {
+            printf("互斥鎖初始化失敗\n");
+            return;
+        }
     }
 }
 
@@ -102,16 +109,14 @@ void enqueueDistance(struct DeliveryPerson *deliveryPersons, int distance) {
     }
 
     deliveryPersons->orderQueue[deliveryPersons->rear] = distance;
-    printf("deliveryPersons->rear: %d\n", deliveryPersons->rear);
-
 }
 
 // 從queue中取出distance
-int dequeueDistance(struct DeliveryPerson *deliveryPersons) {
+void dequeueDistance(struct DeliveryPerson *deliveryPersons) {
 
-    if (deliveryPersons->front == -1) {
-        return -1;  // Queue is empty
-    }
+    // if (deliveryPersons->front == -1) {
+    //     return -1;  // Queue is empty
+    // }
 
     int distance = deliveryPersons->orderQueue[deliveryPersons->front];
 
@@ -120,60 +125,64 @@ int dequeueDistance(struct DeliveryPerson *deliveryPersons) {
     } else {
         deliveryPersons->front = (deliveryPersons->front + 1) % MAX_CLIENTS;
     }
-
-
-    return distance;
 }
 
 // 找到最不忙的送餐员
 int findLeastBusyPerson(struct DeliveryPerson *deliveryPersons) {
    
-    int personId = 0;
+    int cur_personId = 0;
     int shortestTime = INT_MAX;
     for(int i = 0; i < NUM_DELIVERY_PERSONS; i++) {
-        pthread_mutex_lock(&deliveryPersons[i].mutex);
         if(deliveryPersons[i].secondsRemaining < shortestTime) {
             shortestTime = deliveryPersons[i].secondsRemaining;
-            personId = i; 
+            cur_personId = i; 
         }
-        pthread_mutex_unlock(&deliveryPersons[i].mutex);
     }
-
-    return personId;
+    return cur_personId;
 }
 
-// 派单函数  // condition variable 若送單則加時間, 若送完則減時間
+
+
 int dispatchOrder(struct OrderInfo order, struct Shop *shops, struct DeliveryPerson *deliveryPersons, const char *condition, int personId) {
+    // 派单函数  // condition variable 若送單則加時間, 若送完則減時間
+    /*
+    //Henry  dispatchOrder要處理當下thread的問題, 若多個thread同時用deliveryPersons, 若在裡面做加減法會有問題！！！！
+    //TODO 要解決不同thread secondRemaining的問題`  
+    我要在dispatchOrder做的事情應該只有
+    1. confirm後addTime到secondsRemaining, 後回傳secondsRemaining給client(也就是特定thread)去sleep
+    2. 好像不需要queue沒用
+    3. 當多個thread同時用deliveryPersons時, 會變成減很多次secondsRemaining這樣不對
+    4. 當有送貨原在送貨時此送貨員就用mutex鎖住, 並且在送完貨後解鎖且減去它所送的時間
+    */
     // 找到最不忙的送餐员
     int addedTime = shops[order.shopIndex].distance;
-    // pthread_mutex_lock(&deliveryPersons->mutex);
+    int predict_recieveTime;
     if (strstr(condition, "add") != NULL) 
     {
         deliveryPersons[personId].secondsRemaining += addedTime;
         enqueueDistance(&deliveryPersons[personId], addedTime);
-        printf("addedTime: %d\n", addedTime);
-        printf("enqueue!!!!!!!!!!!!!!!!!!!!!\n");
-        // print deliveryPersons->orderQueue[deliveryPersons->front]
-        printf("deliveryPersons->front time: %d\n", deliveryPersons[personId].orderQueue[deliveryPersons[personId].front]);
+        printf("ID: %d, enqueue!!!!!!!!!!!!!!!!!!!!!\n", personId);
     }
     else if (strstr(condition, "minus_one") != NULL)
     {
-        deliveryPersons[personId].secondsRemaining --;
-        deliveryPersons[personId].recieveTime ++;
-        printf("recieveTime: %d\n", deliveryPersons[personId].recieveTime);
-        printf("deliveryPersons->front time: %d\n", deliveryPersons[personId].orderQueue[deliveryPersons[personId].front]);
-        if(deliveryPersons[personId].orderQueue[deliveryPersons[personId].front] == deliveryPersons[personId].recieveTime) {
-            dequeueDistance(&deliveryPersons[personId]);
-            printf("dequeue!!!!!!!!!!!!!!!!!!!!!!\n");
-            deliveryPersons[personId].recieveTime = 0;
+        if(deliveryPersons[personId].secondsRemaining > 0) {
+            deliveryPersons[personId].secondsRemaining --;
+            deliveryPersons[personId].recieveTime ++;
+            printf("ID: %d; recieveTime: %d; secondsRemaining: %d\n", personId, deliveryPersons[personId].recieveTime, deliveryPersons[personId].secondsRemaining);
+            if(deliveryPersons[personId].orderQueue[deliveryPersons[personId].front] == deliveryPersons[personId].recieveTime) {
+                dequeueDistance(&deliveryPersons[personId]);
+                printf("ID: %d, dequeue!!!!!!!!!!!!!!!!!!!!!!\n", personId);
+                deliveryPersons[personId].recieveTime = 0;
+            }
         }
+
+        deliveryPersons[personId].secondsRemaining --;
     }
     else if (strstr(condition, "check_time") != NULL)
     {
-        // pthread_mutex_unlock(&deliveryPersons->mutex);
-        return deliveryPersons[personId].secondsRemaining+addedTime;
+        predict_recieveTime = deliveryPersons[personId].secondsRemaining + addedTime;
+        return predict_recieveTime;
     }
-    // pthread_mutex_unlock(&deliveryPersons->mutex);
 
     return deliveryPersons[personId].secondsRemaining;
 }
@@ -257,7 +266,7 @@ char totalResponse[256] = {0};
 // 處理指令
 void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *orderInfo, struct DeliveryPerson *deliveryPersons) {
     char buffer[256] = {0};
-    int personId, deliveryTime;
+    int personId, deliveryTime, predict_recieveTime;
     recv(clientSocket, buffer, sizeof(buffer), 0);
     // print current thread id
     printf("Current thread id: %ld\n", pthread_self());
@@ -308,7 +317,7 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
             }
             orderInfo->status = ORDER_IN_PROGRESS;
             // save the previous order response in prevResponse
-            strcat(response, "\n");
+            // strcat(response, "\n");
             send(clientSocket, response, 256, 0);
         } else {
             sprintf(response, "Cannot place a new order. There is an existing order in progress.\n");
@@ -318,47 +327,58 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
         // 如果是 "confirm" 指令，確認訂單狀態
         if (orderInfo->status == ORDER_IN_PROGRESS) {
             // 計算外送所需的時間（假設1km花1秒）
-            sprintf(response, "Please wait a few minutes...\n");
+            sprintf(response, "Please wait a few minutes...");
             send(clientSocket, response, 256, 0);
             
-
-            // 將所需要的時間加到訂單狀態中
+            /*
+            確認當時least busy的外送員, 
+            並將所需要的時間利用dispatchOrder加到訂單狀態中
+            */
+            //Henry 此處的mutex一次鎖所有送貨員, 因為secondRemaining兩個送貨原在checkTime要在同一個時間點看
+            // 找到當下最不忙的送餐員
             personId = findLeastBusyPerson(deliveryPersons);
-            printf("least busy personId!!!!!!!!!!!: %d\n", personId);
+            // 鎖定此送貨員
             pthread_mutex_lock(&deliveryPersons->mutex);
+            // 將所需要的時間加到訂單狀態中
+            // printf("least busy personId!!!!!!!!!!!: %d\n", personId);
             // 確認此時的time有沒有超過30秒, 並不會更改secondsRemaining
-            deliveryTime = dispatchOrder(*orderInfo, shops, deliveryPersons, "check_time", personId);
-            if (deliveryTime > 30) {
-                sprintf(response, "Your delivery will take a long time, do you want to wait?\n");
-                send(clientSocket, response, 256, 0);
-                pthread_mutex_unlock(&deliveryPersons->mutex);
-                return;
-            }
-            // 確定要送貨後, 將所需要的時間加到secondsRemaining中
-            deliveryTime = dispatchOrder(*orderInfo, shops, deliveryPersons, "add", personId);
+            //TODO predict recieve time hw3_checker好像沒用到
+            predict_recieveTime = dispatchOrder(*orderInfo, shops, deliveryPersons, "check_time", personId);
+            printf("least busy personId: %d; predict_recieveTime: %d ?????????????????????????????\n", personId, predict_recieveTime);
+            // if (predict_recieveTime > 30)
+            // {
+            //     sprintf(response, "Your delivery will take a long time, do you want to wait?\n");
+            //     send(clientSocket, response, 256, 0);
+            //     pthread_mutex_unlock(&deliveryPersons->mutex);
+            //     return;
+            // }
+            // 確定此送貨員要送貨後, 將所需要的當下時間加到secondsRemaining中
+            dispatchOrder(*orderInfo, shops, deliveryPersons, "add", personId);
+            // deliveryTime只會是3, 5, 8
+            deliveryTime = shops[orderInfo->shopIndex].distance;
             pthread_mutex_unlock(&deliveryPersons->mutex);
 
-            // sleep in deliveryTime seconds
+            
+            //Henry 此處的mutex有問題
+            //  利用此mutex來控制多個thread同時用deliveryPersons時, 不會有問題
+            pthread_mutex_lock(&deliveryPersons[personId].mutex_control_queue);
             for (int i = 0; i < deliveryTime; i++) {
-                // 減去特定外送員的時間
-                pthread_mutex_lock(&deliveryPersons[personId].mutex);
-                sleep(1);
-                printf("deliveryTime: %d\n", deliveryTime-i);
-                //print deliveryPersons secondsRemaining
-                printf("deliveryPersons->secondsRemaining: %d\n", deliveryPersons[personId].secondsRemaining);
+                // 減去特定送貨員的secondsRemaining
                 dispatchOrder(*orderInfo, shops, deliveryPersons, "minus_one", personId);
-                pthread_mutex_unlock(&deliveryPersons->mutex);
+                // sleep 要在鎖解開後才能執行, 不然其他thread無法執行
+                sleep(1); 
             }
-
             
             // 更新訂單狀態
             orderInfo->status = ORDER_DELIVERED;
-
             // 回應客戶端
-            sprintf(response, "Delivery has arrived and you need to pay %d$\n", orderInfo->totalAmount);
+            sprintf(response, "Delivery has arrived and you need to pay %d$", orderInfo->totalAmount);
+            printf("ID: %d,送到囉\n", personId);
+            // fflush(stdout);
             send(clientSocket, response, 256, 0);
             totalCustomer++;
             totalIncome += orderInfo->totalAmount;
+            pthread_mutex_unlock(&deliveryPersons[personId].mutex_control_queue);
 
             // 之後此client不會再傳訊息給server(同cancel)
             orderInfo->status = ORDER_CANCELED;
@@ -382,32 +402,36 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
         send(clientSocket, response, 256, 0);
         
     } else if (strstr(buffer, "Yes") != NULL) {
-        // 將所需要的時間加到訂單狀態中
-        personId = findLeastBusyPerson(deliveryPersons);
-        pthread_mutex_lock(&deliveryPersons->mutex);
-        deliveryTime = dispatchOrder(*orderInfo, shops, deliveryPersons, "add", personId);
-        printf("personId: %d\n", personId);
-        printf("deliveryTime: %d\n", deliveryTime);
-        pthread_mutex_unlock(&deliveryPersons->mutex);
-
-        // sleep in deliveryTime seconds
-        for (int i = 0; i < deliveryTime; i++) {
-            // 減去特定外送員的時間
-            pthread_mutex_lock(&deliveryPersons->mutex);
-            sleep(1);
-            dispatchOrder(*orderInfo, shops, deliveryPersons, "minus_one", personId);
-            pthread_mutex_unlock(&deliveryPersons->mutex);
-        }
+        // 鎖定此送貨員
+        pthread_mutex_lock(&deliveryPersons[personId].mutex);
+        
+        // 確定此送貨員要送貨後, 將所需要的當下時間加到secondsRemaining中
+        dispatchOrder(*orderInfo, shops, deliveryPersons, "add", personId);
+        // deliveryTime只會是3, 5, 8
+        deliveryTime = shops[orderInfo->shopIndex].distance;
+        pthread_mutex_unlock(&deliveryPersons[personId].mutex);
 
         
+        // TODO sleep deliveryTime seconds但是要同時減去特定外送員的secondsRemaining, 且要確保多個thread同時用deliveryPersons時, 不會有問題
+        //Henry 此處的mutex有問題
+        //  利用此mutex來控制多個thread同時用deliveryPersons時, 不會有問題
+        pthread_mutex_lock(&deliveryPersons[personId].mutex_control_queue);
+        for (int i = 0; i < deliveryTime; i++) {
+            // 每個送貨員都要減去一秒
+            dispatchOrder(*orderInfo, shops, deliveryPersons, "minus_one", personId);
+            // sleep 要在鎖解開後才能執行, 不然其他thread無法執行
+            sleep(1); 
+        }
         // 更新訂單狀態
         orderInfo->status = ORDER_DELIVERED;
-
         // 回應客戶端
         sprintf(response, "Delivery has arrived and you need to pay %d$\n", orderInfo->totalAmount);
+        printf("ID: %d,送到囉\n", personId);
+        // fflush(stdout);
         send(clientSocket, response, 256, 0);
         totalCustomer++;
         totalIncome += orderInfo->totalAmount;
+        pthread_mutex_unlock(&deliveryPersons[personId].mutex_control_queue);
 
         // 之後此client不會再傳訊息給server(同cancel)
         orderInfo->status = ORDER_CANCELED;
@@ -449,7 +473,6 @@ void* handleClient(void* arg) {
         }
     }
 }
-
 
 
 int main(int argc, char *argv[]) {
