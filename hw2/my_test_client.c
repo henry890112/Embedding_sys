@@ -14,7 +14,6 @@ void sendCommand(const char *command) {
 
     char buffer[256] = {0};
     recv(clientSocket, buffer, sizeof(buffer), 0);
-    printf("Server response: \n");
     printf("%s\n", buffer);
 }
 
@@ -49,10 +48,6 @@ int main() {
         // 去掉输入字符串中的换行符
         input[strcspn(input, "\n")] = '\0';
 
-        if (strcmp(input, "confirm") == 0) {
-            printf("Please wait a few minutes...\n");
-        }
-        // 發送輸入的指令
         sendCommand(input);
         
     }

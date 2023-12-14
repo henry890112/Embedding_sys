@@ -223,9 +223,16 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
     }    
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     struct Shop shops[3];          // 三家商店
     struct OrderInfo orderInfo = {0};  // 初始化訂單狀態
+
+    if (argc != 2) {
+        printf("Usage: ./hw2 <port>\n");
+        return 1; // indicate error
+    }
+
+    uint16_t port = atoi(argv[1]);
 
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == -1) {
@@ -243,7 +250,7 @@ int main() {
     struct sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(SERVER_PORT);
+    serverAddr.sin_port = htons(port);
 
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1) {
         perror("Binding failed");
@@ -255,7 +262,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Server is listening on port %d...\n", SERVER_PORT);
+    printf("Server is listening on port %d...\n", port);
 
 
     //多一個while是避免可以一直accept新的client導致無法close

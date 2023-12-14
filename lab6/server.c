@@ -69,8 +69,8 @@ void *handle_client(void *arg) {
             account_balance -= amount;
         }
         V(sem_id);
-
         printf("After %s: %d\n", action, account_balance);
+        usleep(10);
     }
 
     close(client_socket);
