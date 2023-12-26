@@ -1,7 +1,3 @@
-Certainly! Here's the revised complete content of the README file from the [Embedding_sys](https://github.com/henry890112/Embedding_sys) GitHub repository, now including Lab 7:
-
----
-
 # Embedding_sys: Embedded Systems Projects
 
 This repository contains a series of homework and lab assignments focused on embedded systems. Each project explores different aspects of embedded system design and implementation.
