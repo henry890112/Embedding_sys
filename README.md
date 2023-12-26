@@ -1,3 +1,7 @@
+Certainly! Here's the revised complete content of the README file from the [Embedding_sys](https://github.com/henry890112/Embedding_sys) GitHub repository, now including Lab 7:
+
+---
+
 # Embedding_sys: Embedded Systems Projects
 
 This repository contains a series of homework and lab assignments focused on embedded systems. Each project explores different aspects of embedded system design and implementation.
@@ -34,3 +38,7 @@ This repository contains a series of homework and lab assignments focused on emb
 ### Lab 6: Web ATM
 - Development of a web-based ATM system.
 - [Lab 6 Details](https://github.com/henry890112/Embedding_sys/blob/main/lab6/)
+
+### Lab 7: Ultimate Password Game
+- A lab project focused on creating a game or system related to the concept of "Ultimate Password."
+- [Lab 7 Details](https://github.com/henry890112/Embedding_sys/blob/main/lab7/)
