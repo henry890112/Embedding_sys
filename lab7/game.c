@@ -17,7 +17,7 @@ int shmid, secret_number;
 
 void cleanup_shared_memory(int signal) {
     if (shmid != -1) {
-        // 解除映射
+        // 解除映射 share memory detach
         shmdt(shmat(shmid, NULL, 0));
         // 删除共享内存
         shmctl(shmid, IPC_RMID, NULL);
@@ -79,3 +79,5 @@ int main(int argc, char *argv[]) {
 
     // return 0;
 }
+
+

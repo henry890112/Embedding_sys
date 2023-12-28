@@ -11,13 +11,9 @@
 #include <sys/sem.h>
 #include <errno.h>
 
-//Henry 若results為共26人, 則我的24, 25, 25才對, 因為這樣才代表我用最少時間送完  
-
 #define SERVER_PORT 8888
 #define NUM_DELIVERY_PERSONS 2
 #define MAX_CLIENTS 1000
-#define SEM_KEY 1234
-
 
 int totalIncome = 0;
 int totalCustomer = 0;
@@ -67,7 +63,6 @@ int V(int s) {
         return 0;
     }
 }
-
 
 // 商品結構
 struct Item {
@@ -151,16 +146,11 @@ void enqueueDistance(struct DeliveryPerson *deliveryPersons, int distance) {
     } else {
         deliveryPersons->rear = (deliveryPersons->rear + 1) % MAX_CLIENTS;
     }
-
     deliveryPersons->orderQueue[deliveryPersons->rear] = distance;
 }
 
 // 從queue中取出distance
 void dequeueDistance(struct DeliveryPerson *deliveryPersons) {
-
-    // if (deliveryPersons->front == -1) {
-    //     return -1;  // Queue is empty
-    // }
 
     int distance = deliveryPersons->orderQueue[deliveryPersons->front];
 
@@ -190,11 +180,8 @@ int findLeastBusyPerson(struct DeliveryPerson *deliveryPersons) {
 int dispatchOrder(struct OrderInfo order, struct Shop *shops, struct DeliveryPerson *deliveryPersons, const char *condition, int personId) {
     // 派单函数  // condition variable 若送單則加時間, 若送完則減時間
     /*
-    //Henry  dispatchOrder要處理當下thread的問題, 若多個thread同時用deliveryPersons, 若在裡面做加減法會有問題！！！！
-    //TODO 要解決不同thread secondRemaining的問題`  
-    我要在dispatchOrder做的事情應該只有
+    //Henry  dispatchOrder要處理當下thread的問題, 若多個thread同時用deliveryPersons, 若在裡面做加減法會有問題！！！！    我要在dispatchOrder做的事情應該只有
     1. confirm後addTime到secondsRemaining, 後回傳secondsRemaining給client(也就是特定thread)去sleep
-    2. 好像不需要queue沒用
     3. 當多個thread同時用deliveryPersons時, 會變成減很多次secondsRemaining這樣不對
     4. 當有送貨原在送貨時此送貨員就用mutex鎖住, 並且在送完貨後解鎖且減去它所送的時間
     */
@@ -381,95 +368,14 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
             // 找到當下最不忙的送餐員c
             pthread_mutex_lock(&deliveryPersons->mutex);
             personId = findLeastBusyPerson(deliveryPersons);
-
-            // 鎖定此送貨員
-            // 將所需要的時間加到訂單狀態中
-            // printf("least busy personId!!!!!!!!!!!: %d\n", personId);
-            // 確認此時的time有沒有超過30秒, 並不會更改secondsRemaining
-
             predict_recieveTime = dispatchOrder(*orderInfo, shops, deliveryPersons, "check_time", personId);
             printf("least busy personId: %d; predict_recieveTime: %d ?????????????????????????????\n", personId, predict_recieveTime);
 
-            
             if (predict_recieveTime > 30)
             {
                 sprintf(response, "Delivery has arrived and you need to pay %d$", orderInfo->totalAmount);
                 send(clientSocket, response, 256, 0);
-
-
-                // // 重新接收client指令
-                // // 重新接收客戶端的回應
-                // char clientResponse[256] = {0};
-                // recv(clientSocket, clientResponse, sizeof(clientResponse), 0);
-                // printf("clientResponse: %s\n", buffer);
-
-                // if (strstr(clientResponse, "Yes") != NULL) 
-                // {
-                //     // 確定此送貨員要送貨後, 將所需要的當下時間加到secondsRemaining中
-                //     dispatchOrder(*orderInfo, shops, deliveryPersons, "add", personId);
-                //     // deliveryTime只會是3, 5, 8
-                //     deliveryTime = shops[orderInfo->shopIndex].distance;
-                //     // totalClient加一, 排序用
-                //     deliveryPersons[personId].totalClient++;
-                //     currentClientId = deliveryPersons[personId].totalClient;
-                    
-
-                //     /*
-                //     currentClientId就是當下的client id
-                //     canRunClientId就是當下可以開始送貨的client id
-                //     canRunClientId<=currentClientId
-                //     */
-                //     printf("ID: %d, currentClientId: %d, canRunClientId: %d\n", personId, currentClientId, deliveryPersons[personId].canRunClientId);
-                //     fflush(stdout);
-
-                //     pthread_mutex_unlock(&deliveryPersons->mutex);
-
-                //     //Henry section2
-                //     //  利用此mutex來控制多個thread同時用deliveryPersons時, 不會有問題
-                //     pthread_mutex_lock(&deliveryPersons[personId].mutex_control_queue);
-                //     // 等待該線程的順序到來
-                //     pthread_cond_signal(&deliveryPersons[personId].condition);
-                //     while (currentClientId != deliveryPersons[personId].canRunClientId) {
-                //         pthread_cond_wait(&deliveryPersons[personId].condition, &deliveryPersons[personId].mutex_control_queue);
-                //     }
-                    
-                //     for (int i = 0; i < deliveryTime; i++) {
-                //         // 減去特定送貨員的secondsRemaining
-                //         dispatchOrder(*orderInfo, shops, deliveryPersons, "minus_one", personId);
-                //         // sleep 要在鎖解開後才能執行, 不然其他thread無法執行
-                //         sleep(1); 
-                //     }
-                    
-                //     // 更新訂單狀態
-                //     orderInfo->status = ORDER_DELIVERED;
-                //     // 回應客戶端
-                //     sprintf(response, "Delivery has arrived and you need to pay %d$", orderInfo->totalAmount);
-                //     send(clientSocket, response, 256, 0);
-                //     printf("ID: %d,送到囉\n", personId);
-
-                //     // 避免兩個thread同時用deliveryPersons時, 只會加1次
-                //     pthread_mutex_lock(&deliveryPersons->mutex);
-                //     totalCustomer++;
-                //     totalIncome += orderInfo->totalAmount;
-                //     pthread_mutex_unlock(&deliveryPersons->mutex);
-                //     // canRunClientId加一, 可以開始送下一單了
-                //     deliveryPersons[personId].canRunClientId++;
-
-                //     pthread_mutex_unlock(&deliveryPersons[personId].mutex_control_queue);
-                //     // 之後此client不會再傳訊息給server(同cancel)
-                //     orderInfo->status = ORDER_CANCELED;
-
-                // }
-                // else if(strstr(clientResponse, "No") != NULL)
-                // {
-                //     orderInfo->status = ORDER_CANCELED;
-                //     // sprintf(response, "Order canceled. Connection will be closed.\n");
-                //     // send(clientSocket, response, 256, 0);
-                //     pthread_mutex_unlock(&deliveryPersons->mutex);
-                // }
                 orderInfo->status = ORDER_CANCELED;
-                // sprintf(response, "Order canceled. Connection will be closed.\n");
-                // send(clientSocket, response, 256, 0);
                 pthread_mutex_unlock(&deliveryPersons->mutex);
 
             }else{
@@ -481,7 +387,6 @@ void handleCommand(int clientSocket, struct Shop *shops, struct OrderInfo *order
                 deliveryPersons[personId].totalClient++;
                 currentClientId = deliveryPersons[personId].totalClient;
                 
-
                 /*
                 currentClientId就是當下的client id
                 canRunClientId就是當下可以開始送貨的client id
@@ -562,12 +467,8 @@ void* handleClient(void* arg) {
     struct OrderInfo orderInfo = {0};  // 初始化訂單狀態
 
     orderInfo.status = ORDER_PENDING;   // 新訂單皆要初始化成ORDER_PENDING
-
-
     int clientSocket = *(int *)arg;
-
     initShopList(shops);  // 初始化商品清單
-
     while(1){
         if (clientSocket == -1) {
         perror("Accept failed");
@@ -622,31 +523,6 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Server is listening on port %d...\n", port);
-
-    // 使用自己指定的key值創建信號量
-    int key = SEM_KEY;
-    if ((sem_id = semget(key, 1, IPC_CREAT | 0666)) == -1) {
-        perror("semget");
-        exit(EXIT_FAILURE);
-    }
-
-    if (sem_id < 0) {
-        if (errno == EEXIST) {
-            // 信號量已經存在，只取得其 ID
-            sem_id = semget(key, 1, 0666);
-            printf("Semaphore already exists. Semaphore ID: %d\n", sem_id);
-        }
-    } else {
-        // 初次創建信號量，將其初值設置為 1
-        printf("Semaphore first created. Semaphore ID: %d\n", sem_id);
-        if (semctl(sem_id, 0, SETVAL, 1) < 0)
-        {
-            fprintf(stderr, "Error setting initial value for the semaphore: %s\n", strerror(errno));
-            exit(1);
-        }
-    }
-
-    printf("Semaphore created successfully. Semaphore ID: %d\n", sem_id);
     
     // initialize deliveryPersons
     delivery_person_init(deliveryPersons);
@@ -654,8 +530,6 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
 
-    //多一個while是避免可以一直accept新的client導致無法close
-    //每次循環都會accept到同一個client
     while(1){
         int client_socket = accept(serverSocket, (struct sockaddr*)&client_addr, &client_len);
         
@@ -667,17 +541,14 @@ int main(int argc, char *argv[]) {
         pthread_t client_thread;
         int *client_socket_ptr = (int *)malloc(sizeof(int));
         *client_socket_ptr = client_socket;
-
         if (pthread_create(&client_thread, NULL, handleClient, (void *)client_socket_ptr) != 0) {
             perror("pthread_create");
             close(client_socket);
             free(client_socket_ptr);
         }
-
         pthread_detach(client_thread);
     }
     
     close(serverSocket);
-
     return 0;
 }

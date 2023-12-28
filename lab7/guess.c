@@ -25,10 +25,9 @@ void timer_handler(int signum) {
     }
 
     shared_memory->guess = (lower_bound + upper_bound) / 2;
-    // printf("current lower_bound: %d, upper_bound: %d, guess: %d\n", lower_bound, upper_bound, shared_memory->guess);
     printf("Guess: %d\n", shared_memory->guess);
     kill(pid, SIGUSR1);
-    // sleep to wait for the result
+    // sleep to wait for the result from game.c 因為shared_memory->result是在game.c裡面被寫入的
     usleep(100);
 
     if (strcmp(shared_memory->result, "smaller") == 0) {
