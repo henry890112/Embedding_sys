@@ -19,7 +19,7 @@
 #define HEIGHT 240
 #define BUFFER_COUNT 1
 #define PORT 8000
-#define BUFSIZE 25600
+#define BUFSIZE 38400
 #define MAX_IMAGE_SIZE 153600
 
 

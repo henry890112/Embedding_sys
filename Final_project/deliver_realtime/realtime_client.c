@@ -17,6 +17,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_thread.h>
 
+// #define SERVER_IP "192.168.50.125" // 更改为服务器的IP地址
 #define SERVER_IP "127.0.0.1" // 更改为服务器的IP地址
 #define PORT 8000
 #define BUFSIZE 38400
@@ -111,27 +112,38 @@ int main(int argc, char *argv[]) {
             // 數據接收完成或錯誤，處理這些情況
             break;
         }
-        // printf("Received %d bytes\n", bytes_received);  
+        printf("Received %d bytes\n", bytes_received);  
         if(bytes_received == 0)  // check block
         {
-            // printf("checker block\n");
-            if (current_size >= MAX_IMAGE_SIZE) {
+            printf("checker block\n");
+            if (current_size == MAX_IMAGE_SIZE) {
                 // 我們已經收到了一幅完整的影像
                 SDL_UpdateTexture(texture, NULL, image_buffer, WIDTH * 2);
                 SDL_RenderClear(renderer);
                 SDL_RenderCopy(renderer, texture, NULL, NULL);
                 SDL_RenderPresent(renderer);
-
-                // 重置計數器，為接收下一幅影像準備
+  
+            }
+            // 重置計數器，為接收下一幅影像準備
+            current_size = 0;
+            // 清空緩衝區
+            memset(image_buffer, 0, MAX_IMAGE_SIZE); 
+        }else
+        {  // solve沒接到0byte的checker block
+            if(current_size == MAX_IMAGE_SIZE)
+            {
+                    // 重置計數器，為接收下一幅影像準備
                 current_size = 0;
                 // 清空緩衝區
-                memset(image_buffer, 0, MAX_IMAGE_SIZE);   
+                memset(image_buffer, 0, MAX_IMAGE_SIZE);
             }
-        }else{
-             // 將buffer資訊存在image_buffer + current_size
+            else
+            {
+            // 將buffer資訊存在image_buffer + current_size
             // printf("Save in the buffer\n");
-            memcpy(image_buffer + current_size, buffer, bytes_received);
-            current_size += bytes_received;
+                memcpy(image_buffer + current_size, buffer, bytes_received);
+                current_size += bytes_received;
+            }
         }
         // 檢查退出事件
         while (SDL_PollEvent(&event)) {
