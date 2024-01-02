@@ -23,8 +23,35 @@
 #define BUFSIZE 38400
 #define WIDTH 320
 #define HEIGHT 240  
+#define WINDOW_WIDTH 400
+#define WINDOW_HEIGHT 300
 #define BUFFER_COUNT 1
 #define MAX_IMAGE_SIZE 153600
+
+// 勾選和叉叉按鈕的尺寸
+const int button_width = 50;
+const int button_height = 50;
+
+// 設置勾選和叉叉按鈕的位置
+SDL_Rect check_button_rect = { 60, HEIGHT + 20, button_width, button_height }; // x, y, width, height
+SDL_Rect cross_button_rect = { WIDTH - 60 - button_width, HEIGHT + 20, button_width, button_height }; // x, y, width, height
+
+// 繪製按鈕的函數
+void draw_buttons(SDL_Renderer *renderer) {
+
+    // 設置背景為黑色並清除
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // 黑色
+    SDL_RenderClear(renderer);
+
+    // 繪製勾選按鈕
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // 設置為綠色
+    SDL_RenderFillRect(renderer, &check_button_rect);
+
+    // 繪製叉叉按鈕
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // 設置為紅色
+    SDL_RenderFillRect(renderer, &cross_button_rect);
+}
+
 
 void create_client_socket(int *sockfd, struct sockaddr_in *server_addr) {
     // 建立套接字
@@ -48,27 +75,38 @@ void init_SDL(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **textur
         exit(1);
     }
 
-    // 创建窗口
-    *window = SDL_CreateWindow("Client Camera", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
+    // 創建窗口
+    *window = SDL_CreateWindow("Client Camera", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
     if (!*window) {
         fprintf(stderr, "SDL: could not set video mode - exiting\n");
+        SDL_Quit();
         exit(1);
     }
 
-    // 创建渲染器
-    *renderer = SDL_CreateRenderer(*window, -1, 0);
+    // 創建渲染器
+    *renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!*renderer) {
         fprintf(stderr, "SDL: could not create renderer - exiting\n");
+        SDL_DestroyWindow(*window);
+        SDL_Quit();
         exit(1);
     }
 
-    // 创建纹理
+    // 設置渲染器的縮放品質
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
+
+    // 創建紋理，用於顯示影像，紋理的大小應該與影像一致
     *texture = SDL_CreateTexture(*renderer, SDL_PIXELFORMAT_YUY2, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     if (!*texture) {
         fprintf(stderr, "SDL: could not create texture - exiting\n");
+        SDL_DestroyRenderer(*renderer);
+        SDL_DestroyWindow(*window);
+        SDL_Quit();
         exit(1);
     }
 }
+
+
 
 int main(int argc, char *argv[]) {
     int sockfd;
@@ -79,7 +117,13 @@ int main(int argc, char *argv[]) {
     // 创建套接字
     create_client_socket(&sockfd, &server_addr);
 
-    
+
+    SDL_Rect image_rect;
+    image_rect.x = (WINDOW_WIDTH - WIDTH) / 2; // 將影像水平居中
+    image_rect.y = 0; // 將影像置於窗口頂部
+    image_rect.w = WIDTH; // 影像的原始寬度
+    image_rect.h = HEIGHT; // 影像的原始高度
+
     // init SDL 去接收影像
     SDL_Window *window = NULL;
     SDL_Renderer *renderer = NULL;
@@ -112,7 +156,7 @@ int main(int argc, char *argv[]) {
             // 數據接收完成或錯誤，處理這些情況
             break;
         }
-        printf("Received %d bytes\n", bytes_received);  
+        // printf("Received %d bytes\n", bytes_received);  
         if(bytes_received == 0)  // check block
         {
             printf("checker block\n");
@@ -120,8 +164,36 @@ int main(int argc, char *argv[]) {
                 // 我們已經收到了一幅完整的影像
                 SDL_UpdateTexture(texture, NULL, image_buffer, WIDTH * 2);
                 SDL_RenderClear(renderer);
-                SDL_RenderCopy(renderer, texture, NULL, NULL);
+                draw_buttons(renderer); // 繪製勾選和叉叉按鈕
+                SDL_RenderCopy(renderer, texture, NULL, &image_rect);
+                
                 SDL_RenderPresent(renderer);
+                // 檢查退出事件
+                while (SDL_PollEvent(&event)) {
+                    if (event.type == SDL_QUIT) {
+                        running = 0;
+                    } else if (event.type == SDL_MOUSEBUTTONDOWN) {
+                        int x, y;
+                        SDL_GetMouseState(&x, &y);
+
+                        // 檢查是否點擊勾選按鈕
+                        if (x >= check_button_rect.x && x < check_button_rect.x + check_button_rect.w &&
+                            y >= check_button_rect.y && y < check_button_rect.y + check_button_rect.h) {
+                            // 處理勾選按鈕點擊事件
+                            printf("Check button clicked\n");
+                            // 可以在這裡加入確認觀看影像的邏輯
+                        }
+
+                        // 檢查是否點擊叉叉按鈕
+                        if (x >= cross_button_rect.x && x < cross_button_rect.x + cross_button_rect.w &&
+                            y >= cross_button_rect.y && y < cross_button_rect.y + cross_button_rect.h) {
+                            // 處理叉叉按鈕點擊事件
+                            printf("Cross button clicked\n");
+                            // 可以在這裡加入不觀看影像並退出的邏輯
+                            running = 0; // 假設點擊叉叉就退出應用程式
+                        }
+                    }
+                }
   
             }
             // 重置計數器，為接收下一幅影像準備
@@ -146,13 +218,13 @@ int main(int argc, char *argv[]) {
             }
         }
         // 檢查退出事件
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = 0;
-            }
-        }
-        printf("Current Image Size: %d\n", current_size);
-        printf("--------------------\n");
+        // while (SDL_PollEvent(&event)) {
+        //     if (event.type == SDL_QUIT) {
+        //         running = 0;
+        //     }
+        // }
+        // printf("Current Image Size: %d\n", current_size);
+        // printf("--------------------\n");
     }
 
     printf("Over\n");
