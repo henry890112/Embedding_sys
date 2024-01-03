@@ -18,9 +18,11 @@
 #define WIDTH 320
 #define HEIGHT 240
 #define BUFFER_COUNT 1
-#define PORT 8000
+#define PORT 9000
 #define BUFSIZE 38400
 #define MAX_IMAGE_SIZE 153600
+#define INIT_WINDOW_POS_X 100
+#define INIT_WINDOW_POS_Y 100
 
 
 // Global variables
@@ -158,7 +160,7 @@ void init_SDL(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **textur
     }
 
     // 创建窗口
-    *window = SDL_CreateWindow("Server Camera", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
+    *window = SDL_CreateWindow("Front Server Camera", INIT_WINDOW_POS_X, INIT_WINDOW_POS_Y, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
     if (!*window) {
         fprintf(stderr, "SDL: could not set video mode - exiting\n");
         exit(1);
@@ -303,6 +305,8 @@ int main(int argc, char *argv[]) {
 
     // 確定接收到客戶端的地址後，開始發送文件數據
     int n, packet_index = 0;
+    unsigned char image_buffer[MAX_IMAGE_SIZE];
+    int current_size = 0;
     
     while (1) {
         struct sockaddr_in client_addr;

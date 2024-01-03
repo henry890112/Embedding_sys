@@ -2,8 +2,10 @@ CC=gcc
 CFLAGS=-I/usr/include
 
 all:
-	$(CC) -o realtime_server realtime_server.c -lpthread -lSDL2 -lv4l2
-	$(CC) -o realtime_client realtime_client.c -lpthread -lSDL2 -lv4l2
+	$(CC) -o back_realtime_client_udp back_realtime_client_udp.c -lpthread -lSDL2 -lv4l2
+	$(CC) -o back_realtime_server_udp back_realtime_server_udp.c -lpthread -lSDL2 -lv4l2
+	$(CC) -o front_realtime_client_udp front_realtime_client_udp.c -lpthread -lSDL2 -lv4l2
+	$(CC) -o front_realtime_server_udp front_realtime_server_udp.c -lpthread -lSDL2 -lv4l2
 
 clean:
-	rm -rf realtime_server realtime_client 
+	rm -rf back_realtime_client_udp back_realtime_server_udp front_realtime_client_udp front_realtime_server_udp

@@ -17,24 +17,28 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_thread.h>
 
-// #define SERVER_IP "192.168.50.125" // 更改为服务器的IP地址
+// #define SERVER_IP "192.168.50.11" // 更改为服务器的IP地址
 #define SERVER_IP "127.0.0.1" // 更改为服务器的IP地址
 #define PORT 8000
+#define TCP_PORT 8080
 #define BUFSIZE 38400
+#define TCP_BUFSIZE 1024
 #define WIDTH 320
 #define HEIGHT 240  
-#define WINDOW_WIDTH 400
-#define WINDOW_HEIGHT 300
+#define WINDOW_WIDTH 320
+#define WINDOW_HEIGHT 290
 #define BUFFER_COUNT 1
 #define MAX_IMAGE_SIZE 153600
+#define INIT_WINDOW_POS_X 420
+#define INIT_WINDOW_POS_Y 100
 
 // 勾選和叉叉按鈕的尺寸
 const int button_width = 50;
 const int button_height = 50;
 
 // 設置勾選和叉叉按鈕的位置
-SDL_Rect check_button_rect = { 60, HEIGHT + 20, button_width, button_height }; // x, y, width, height
-SDL_Rect cross_button_rect = { WIDTH - 60 - button_width, HEIGHT + 20, button_width, button_height }; // x, y, width, height
+SDL_Rect check_button_rect = { 60, HEIGHT, button_width, button_height }; // x, y, width, height
+SDL_Rect cross_button_rect = { WIDTH - 60 - button_width, HEIGHT, button_width, button_height }; // x, y, width, height
 
 // 繪製按鈕的函數
 void draw_buttons(SDL_Renderer *renderer) {
@@ -76,7 +80,7 @@ void init_SDL(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **textur
     }
 
     // 創建窗口
-    *window = SDL_CreateWindow("Client Camera", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
+    *window = SDL_CreateWindow("Client Camera", INIT_WINDOW_POS_X, INIT_WINDOW_POS_Y, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
     if (!*window) {
         fprintf(stderr, "SDL: could not set video mode - exiting\n");
         SDL_Quit();
@@ -106,6 +110,44 @@ void init_SDL(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **textur
     }
 }
 
+void sendAlarmToServer() {
+
+    // use TCP to send alarm message to TCP server
+    int tcp_sockfd;
+    struct sockaddr_in tcp_server_addr;
+    char tcp_buf[TCP_BUFSIZE];
+
+    // 建立套接字
+    tcp_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (tcp_sockfd < 0) {
+        perror("Error creating socket");
+        exit(1);
+    }
+
+    // 初始化服务器地址结构
+    memset(&tcp_server_addr, 0, sizeof(tcp_server_addr));
+    tcp_server_addr.sin_family = AF_INET;
+    tcp_server_addr.sin_port = htons(TCP_PORT);
+    tcp_server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+
+    // 連接伺服器
+    if (connect(tcp_sockfd, (struct sockaddr *)&tcp_server_addr, sizeof(tcp_server_addr)) < 0) {
+        perror("Error connecting to server");
+        close(tcp_sockfd);
+        exit(1);
+    }
+
+    // 向服务器发送请求以开始接收数据
+    strcpy(tcp_buf, "01"); // back傳送01給server
+    if (send(tcp_sockfd, tcp_buf, strlen(tcp_buf), 0) < 0) {
+        perror("Error sending to server");
+        close(tcp_sockfd);
+        exit(1);
+    }
+
+    printf("Alarm message sent to server\n");
+    close(tcp_sockfd);
+}
 
 
 int main(int argc, char *argv[]) {
@@ -149,7 +191,7 @@ int main(int argc, char *argv[]) {
     unsigned char image_buffer[MAX_IMAGE_SIZE];
     char buffer[BUFSIZE];
     int current_size = 0;
-    int checker = 0;
+    int alarm = 0;
     while (running) {
         int bytes_received = recvfrom(sockfd, buffer, BUFSIZE, 0, NULL, NULL);
         if (bytes_received < 0) {
@@ -159,7 +201,7 @@ int main(int argc, char *argv[]) {
         // printf("Received %d bytes\n", bytes_received);  
         if(bytes_received == 0)  // check block
         {
-            printf("checker block\n");
+            // printf("checker block\n");
             if (current_size == MAX_IMAGE_SIZE) {
                 // 我們已經收到了一幅完整的影像
                 SDL_UpdateTexture(texture, NULL, image_buffer, WIDTH * 2);
@@ -180,17 +222,20 @@ int main(int argc, char *argv[]) {
                         if (x >= check_button_rect.x && x < check_button_rect.x + check_button_rect.w &&
                             y >= check_button_rect.y && y < check_button_rect.y + check_button_rect.h) {
                             // 處理勾選按鈕點擊事件
-                            printf("Check button clicked\n");
+                            printf("Check button clicked 勾勾\n");
                             // 可以在這裡加入確認觀看影像的邏輯
+                            running = 0;
+                            alarm = 0; // 沒事囉
                         }
 
                         // 檢查是否點擊叉叉按鈕
                         if (x >= cross_button_rect.x && x < cross_button_rect.x + cross_button_rect.w &&
                             y >= cross_button_rect.y && y < cross_button_rect.y + cross_button_rect.h) {
                             // 處理叉叉按鈕點擊事件
-                            printf("Cross button clicked\n");
+                            printf("Cross button clicked 叉叉\n");
                             // 可以在這裡加入不觀看影像並退出的邏輯
                             running = 0; // 假設點擊叉叉就退出應用程式
+                            alarm = 1; // 警報
                         }
                     }
                 }
@@ -217,14 +262,21 @@ int main(int argc, char *argv[]) {
                 current_size += bytes_received;
             }
         }
-        // 檢查退出事件
-        // while (SDL_PollEvent(&event)) {
-        //     if (event.type == SDL_QUIT) {
-        //         running = 0;
-        //     }
-        // }
-        // printf("Current Image Size: %d\n", current_size);
-        // printf("--------------------\n");
+    }
+
+    printf("Alarm: %d\n", alarm);
+
+    if (alarm == 1)
+    {
+        printf("alarm\n");
+        // 新建立一個tcp來傳資訊給tcp server
+        sendAlarmToServer();
+
+    }
+    else if (alarm == 0)
+    {
+        printf("no alarm\n");
+        // 重新執行detection
     }
 
     printf("Over\n");
