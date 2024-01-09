@@ -1,6 +1,11 @@
 # Embedding_sys: Embedded Systems Projects
 
-This repository contains a series of homework and lab assignments focused on embedded systems. Each project explores different aspects of embedded system design and implementation.
+This repository contains a series of final project, homework and lab assignments focused on embedded systems. Each project explores different aspects of embedded system design and implementation.
+
+## Final Project - Home Security System
+- This project aims to develop an automatic detection system designed to identify intruders at the doorstep. It is equipped with a user interface accessible to every resident, facilitating interaction with the system to prevent unauthorized entry into homes. The system primarily consists of three components: Infrared Detection, Program Detection, and Remote Image Viewing, each available to all residents.
+- Key Technologies: UDP realtime streaming, network sockets(TCP/IP), GPIO manipulation, character device drivers, Signal handling, inter-process communication(share memory), itimer.
+- [Final Project Details](https://github.com/henry890112/Embedding_sys/tree/main/Final_project_all)
 
 ## Homework Assignments
 
